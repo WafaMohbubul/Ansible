@@ -1,11 +1,22 @@
-### Install Ansibile
+## Install Ansibile
 
 1. Create instance with AMI = 20.04 lts
 2. Connect via SSH to Gitbash terminal
-3. Run commands: `sudo apt update`
-4. `sudo apt upgrade -y`
-5. *`sudo apt install software-properties-common`*: Installs the `software-properties-common` package, which provides scripts for managing software repositories. This is a prerequisite for adding the Ansible repository.
-6. *`sudo apt-add-repository ppa:ansible/ansible`*: Adds the Ansible Personal Package Archive (PPA) to your list of sources. This ensures that you can install Ansible directly from this source.
+3. Run commands: 
+```
+sudo apt update
+```
+```
+sudo apt upgrade -y
+```
+4. Installs the `software-properties-common` package, which provides scripts for managing software repositories. This is a prerequisite for adding the Ansible repository:
+```
+sudo apt install software-properties-common
+```
+6. Adds the Ansible Personal Package Archive (PPA) to your list of sources. This ensures that you can install Ansible directly from this source:
+```commandline
+*`sudo apt-add-repository ppa:ansible/ansible`*: 
+```
 7. *`sudo apt update -y`*: Updates the local package cache to make sure you have the latest list of packages from all repositories, including the recently added Ansible PPA.
 8. *`sudo apt install ansible -y`*: Installs the Ansible software package.
 9. *`ansible --version`*: Checks the installed version of Ansible.
@@ -161,4 +172,140 @@ Should out the below:
 
 ![](install_nodejs.png)
 
+## Installing MongoDB  
+
+1. `sudo nano mongo-playbook.yml` 
+2. Copy and paste command
+```commandline
+#this playbook is to set up mongodb in the db ec2
+
+---
+
+#agent node name/ip
+- hosts: db
+
+#gather facts
+  gather_facts: yes
+#provide admin access
+  become: true
+#provide instructions
+  tasks:
+  - name: set up mongodb in instance
+    #shell:
+    apt: pkg=mongodb state=present
+#ensure db is running
+
+```
+Run the script: `sudo ansible-playbook mongo-playbook.yml`
+
+### Checking the mongodb is working
+Run command:
+
+```commandline
+sudo ansible db -a "sudo systemctl status mongodb"
+```
+NOTE: You can check the app or db when it is running using this command 
+
+## Creating Playbook to configure the bind IP
+1. create new playbook
+```commandline
+sudo nano mongodb-config.yml
+```
+2. Copy and paste the commands:
+```commandline
+#this playbook is to confifure bind ip
+---
+
+- name: Configure MongoDB to Accept Requests
+  hosts: db
+  become: yes
+  tasks:
+    - name: Set bind IP to accept requests from all IPs
+      lineinfile:
+        path: /etc/mongodb.conf
+        regexp: '^bindIp:'
+        line: 'bindIp: 0.0.0.0'
+
+```
+3. Save and run to see if it works:
+```commandline
+sudo ansible-playbook mongodb-config.yml
+```
+
+
+## Restart and enable the db after change
+
+
+1. go back into the mongodb-config.yml:
+2. Add the last bits to restart and enable
+```commandline
+---
+- name: Configure MongoDB to Accept Requests
+  hosts: db
+  become: yes
+  tasks:
+    - name: Set bind IP to accept requests from all IPs
+      lineinfile:
+        path: /etc/mongodb.conf
+        regexp: '^bindIp:'
+        line: 'bindIp: 0.0.0.0'
+
+    - name: Restart MongoDB Service
+      service:
+        name: mongodb
+        state: restarted
+
+    - name: Enable MongoDB Service on Boot
+      service:
+        name: mongodb
+        enabled: yes
+```
+## Creating deploy-app file
+1. `sudo nano deploy-app.yml`
+2. Copy and paste:
+```commandline
+
+# This playbook is to set the DB_HOST env var in the app instance.
+
+---
+
+- hosts: web
+  gather_facts: yes
+  become: true
+
+  tasks:
+
+    - name: exports the DB_HOST environment variable.
+      become: true
+      lineinfile:
+        path: /etc/environment
+        line: 'DB_HOST=mongodb://54.170.216.34:27017/posts'
+        state: present
+      notify: Reload environment
+
+  handlers:
+    - name: Reload environment
+      become: true
+      command: 'source /etc/environment'
+
+```
+3. Run `sudo ansible-playbook deploy-app.yml`
+
+## Create env var with DB IP
+1. Run command:
+```
+sudo ansible web -m shell -a"sudo chmod 644 /etc/environment"  
+```
+2. The run the deploy-app file
+```
+sudo ansible-playbook deploy-app.yml
+```
+3. To check this has worked now, go into the **app** Gitbash terminal and run command:
+```
+cat /etc/environment
+```
+We should expect the DB_HOST to be there as shown below:
+![](expected_output.png)
+
+## Relaunching the App
 
