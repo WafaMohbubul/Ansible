@@ -27,7 +27,8 @@
 5. ls to check if it's `tech254.pem`
 
 #### Connecting to different instance
-1. 
+1. Inside first terminal, Run command `nano inventory.ini`
+2. Copy and paste:
 ```
 # inventory.ini
 [my_instance]
@@ -35,15 +36,22 @@
 ```
 NOTE: IP ADDRESS IS DEPENDANT ON WHICH instance you want to connect.
 
+3. Run:
 ```
 chmod 400 ~/.ssh/tech254.pem
+```
 
+4. Run inventory
+```
 ansible -i inventory.ini my_instance -m ping
+```
 
+5. Create playbook test
+```
 nano my_playbook.yml
 ```
 
-Copy and paste:
+3. Copy and paste:
 ```
 ---
 - name: My Ansible Playbook
@@ -53,3 +61,104 @@ Copy and paste:
       command: echo "Hello, Ansible!"
 ```
 `ansible-playbook -i inventory.ini my_playbook.yml`s
+
+### Check that the connection is connected properly and working (ping)
+1. `cd /etc/ansible/`
+2. sudo nano hosts
+3. Copy and paste this:
+```
+[web]
+
+ec2-instance ansible_host=3.252.98.110 ansible_user=ubuntu ansible_ssh_private_key_file=/home/ubuntu/.ssh/tech2>
+# sudo chmod 400 tech254.pem
+
+[db]
+
+ec2-instance ansible_host=54.170.216.34 ansible_user=ubuntu ansible_ssh_private_key_file=/home/ubuntu/.ssh/tech>
+```
+
+## Installing nginx and nodelJS in Ansible
+
+1. Run command
+```
+sudo ansible web -m ping
+```
+
+2. Go into host file using command
+```
+sudo nano hosts
+```
+
+3. Create new script to install ngin: `sudo nano install-nginx.yml`
+
+4. Copy and paste
+
+``` 
+create a playbook to provision ngin web server in web-node
+---
+#starts with thee dashes
+# where do you want to install or run this playbook
+- hosts: web
+
+# find the facts
+  gather_facts: yes
+
+# provide admin access to this playbook
+  become: true
+
+# provide the actual instructions - instal nginx
+  tasks:
+  - name: provision/install/configure Nginx
+    apt: pkg=nginx state=present
+
+# ensure nginx is running/enabled
+```
+
+5. Run the script: `sudo ansible-playbook install-nginx.yml`
+
+6. Create new script to install nodeJS: `sudo nano install-nodejs.yml`
+
+7. Copy and paste commands:
+```
+---
+# where do you want to install or run this playbook
+- hosts: web
+
+# find the facts
+  gather_facts: yes
+
+# provide admin access to this playbook - use sudo
+  become: true
+
+# provide the actual instructions - install NodeJS
+  tasks:
+  - name: Install the NodeSource Node.js 12.x release PPA
+    shell: "curl -sL https://deb.nodesource.com/setup_12.x | bash -"
+
+  - name: Install Node.js
+    apt: pkg=nodejs state=present
+
+  - name: Check Node.js version
+    shell: "node -v"
+    register: node_version
+
+  - name: Display Node.js version
+    debug:
+      msg: "Node.js version is {{ node_version.stdout }}"
+
+  - name: Check NPM version
+    shell: "npm -v"
+    register: npm_version
+
+  - name: Display NPM version
+    debug:
+      msg: "NPM version is {{ npm_version.stdout }}"
+```
+
+Run the script: `sudo ansible-playbook install-nodejs.yml`
+
+Should out the below:
+
+![](install_nodejs.png)
+
+
